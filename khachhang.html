@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>U&I Logistics | Cổng Khách Hàng Trực Tuyến (Customer Portal)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body data-portal="customer">
+
+    <header class="navbar">
+        <div class="container nav-container">
+            <a href="#report" class="brand">
+                <div class="brand-logo"><i class="fa-solid fa-ship"></i></div>
+                <div class="brand-text">
+                    <h1>U&amp;I LOGISTICS</h1>
+                    <span>Customer Portal • Cổng Dịch Vụ Khách Hàng</span>
+                </div>
+            </a>
+
+            <nav class="nav-links">
+                <a href="#report" class="nav-item active" data-page="report">
+                    <i class="fa-solid fa-bolt"></i> Báo cáo sự cố tức thì
+                </a>
+                <a href="#tracking" class="nav-item" data-page="tracking">
+                    <i class="fa-solid fa-magnifying-glass-location"></i> Theo dõi tiến độ xử lý
+                    <span class="nav-counter" id="cust-ticket-count">0</span>
+                </a>
+                <a href="#guide" class="nav-item" data-page="guide">
+                    <i class="fa-solid fa-book-open-reader"></i> Hướng dẫn &amp; Hỗ trợ CSKH
+                </a>
+            </nav>
+
+            <div class="nav-actions">
+                <span class="realtime-indicator" id="netStatusBadge" title="Đường truyền đồng bộ trực tiếp tới Máy chủ CSKH">
+                    <span class="pulse-dot"></span> <span id="netStatusText">Đường truyền ổn định</span>
+                </span>
+                <span class="user-chip" id="customerUserBadge">
+                    <i class="fa-solid fa-circle-user"></i> <span id="loggedCustName">Khách hàng</span>
+                </span>
+                <button type="button" class="btn-reset" onclick="logoutPortal()">
+                    <i class="fa-solid fa-right-from-bracket"></i> Đăng xuất
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container page-container">
+
+        <!-- LIÊN KẾT 1: BÁO CÁO SỰ CỐ TỨC THÌ (#report) -->
+        <section id="page-report" class="page-view active">
+            <div class="page-banner">
+                <div>
+                    <span class="banner-tag"><i class="fa-solid fa-satellite-dish"></i> Kết nối trực tiếp Máy chủ CSKH 24/7</span>
+                    <h2>Báo Cáo Sự Cố Lô Hàng Tức Thì</h2>
+                    <p>Gửi thông tin sự cố trực tiếp về Hệ thống Máy chủ CSKH của U&amp;I Logistics. Hệ thống tự động khởi tạo mã Ticket duy nhất và phân luồng đến đúng bộ phận chuyên trách trong thời gian dưới 05 phút.</p>
+                </div>
+                <div class="timer-card">
+                    <span class="timer-label"><i class="fa-regular fa-clock"></i> Thời gian thao tác</span>
+                    <strong id="formTimerText">00:00</strong>
+                    <small>Thao tác đơn giản 01 - 02 phút</small>
+                </div>
+            </div>
+
+            <div class="report-layout">
+                <div class="card-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h3><i class="fa-solid fa-file-signature text-primary"></i> Biểu Mẫu Gửi Yêu Cầu Xử Lý Sự Cố</h3>
+                            <p>Chọn phân loại sự cố và nhập mã vận đơn, booking kèm chứng từ để gửi trực tiếp về hệ thống.</p>
+                        </div>
+                        <button type="button" id="btnFillSample" class="btn-secondary">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Điền thông tin mẫu
+                        </button>
+                    </div>
+
+                    <form id="incident-form" class="incident-form" novalidate>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="customerName">Tên Doanh nghiệp / Khách hàng <span class="required">*</span></label>
+                                <input type="text" id="customerName" placeholder="VD: Công ty TNHH Xuất Nhập Khẩu Minh Phát" required>
+                                <small class="error-msg" id="err-customerName"></small>
+                            </div>
+                            <div class="form-group">
+                                <label for="customerContact">Số điện thoại / Email nhận phản hồi <span class="required">*</span></label>
+                                <input type="text" id="customerContact" placeholder="VD: 0909 123 456 | ops@minhphat.vn" required>
+                                <small class="error-msg" id="err-customerContact"></small>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="incidentType">Phân loại sự cố <span class="required">*</span></label>
+                                <select id="incidentType" required>
+                                    <option value="">-- Chọn danh mục sự cố --</option>
+                                    <option value="transport">🚛 Trễ xe / Sự cố vận tải</option>
+                                    <option value="customs">🛃 Vướng hải quan / Sự cố tờ khai</option>
+                                    <option value="document">📄 Sai sót chứng từ (B/L, Invoice, Packing List, C/O)</option>
+                                    <option value="damage">📦 Hư hỏng hàng hóa</option>
+                                    <option value="warehouse">🏭 Sự cố lưu kho / Xuất nhập kho</option>
+                                </select>
+                                <small class="error-msg" id="err-incidentType"></small>
+                            </div>
+                            <div class="form-group">
+                                <label for="priorityLevel">Mức độ ưu tiên</label>
+                                <select id="priorityLevel">
+                                    <option value="Khẩn cấp">🔴 Khẩn cấp (Lô hàng chờ thông quan / Giao gấp)</option>
+                                    <option value="Cao" selected>🟠 Cao (Xử lý ngay trong ca làm việc)</option>
+                                    <option value="Tiêu chuẩn">🔵 Tiêu chuẩn (Xử lý theo cam kết dịch vụ)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="routing-preview" class="routing-preview">
+                            <div class="routing-icon"><i class="fa-solid fa-paper-plane"></i></div>
+                            <div class="routing-details">
+                                <span class="routing-label">Luồng tiếp nhận &amp; phân luồng tự động:</span>
+                                <strong id="routing-target">Chọn "Phân loại sự cố" để xem bộ phận chuyên trách tiếp nhận...</strong>
+                            </div>
+                            <div class="sla-tag"><i class="fa-solid fa-bolt"></i> Tiếp nhận &lt; 05 phút</div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="waybillCode">Mã Vận Đơn (Bill of Lading - B/L) <span class="required">*</span></label>
+                                <input type="text" id="waybillCode" placeholder="VD: UIL-BL2026889" required>
+                                <small class="error-msg" id="err-waybillCode"></small>
+                            </div>
+                            <div class="form-group">
+                                <label for="bookingCode">Mã Booking <span class="required">*</span></label>
+                                <input type="text" id="bookingCode" placeholder="VD: BK-992041" required>
+                                <small class="error-msg" id="err-bookingCode"></small>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="incidentDesc">Nội dung chi tiết sự cố <span class="required">*</span></label>
+                            <textarea id="incidentDesc" rows="3" placeholder="Mô tả rõ tình trạng hiện tại, biển số xe, số container, số tờ khai hải quan hoặc nội dung chứng từ cần điều chỉnh..." required></textarea>
+                            <small class="error-msg" id="err-incidentDesc"></small>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="label-between">
+                                <label>Tải chứng từ &amp; Hình ảnh đính kèm (Tự động tối ưu dung lượng)</label>
+                                <small id="file-count-label">Đã đính kèm: 0 file</small>
+                            </div>
+                            <div class="upload-zone" id="upload-zone">
+                                <input type="file" id="fileInput" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" hidden>
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                                <p>Nhấn để chọn file hoặc kéo thả chứng từ, hình ảnh vào khung này</p>
+                                <span>Hỗ trợ: JPG, PNG, PDF, Word, Excel (Tự động nén ảnh tốc độ cao)</span>
+                            </div>
+                            <div id="file-list" class="file-preview-grid"></div>
+                        </div>
+
+                        <button type="submit" id="btnSubmitIncident" class="btn-submit">
+                            <i class="fa-solid fa-paper-plane"></i> Gửi Yêu Cầu Trực Tiếp Về Hệ Thống CSKH
+                        </button>
+                    </form>
+                </div>
+
+                <div class="side-column">
+                    <div id="created-ticket-alert" class="card-panel success-ticket-box" hidden></div>
+
+                    <div class="card-panel side-info-card">
+                        <h4><i class="fa-solid fa-circle-check text-primary"></i> Cam Kết Dịch Vụ U&amp;I Logistics</h4>
+                        <p class="side-desc">Cổng tiếp nhận số hóa tập trung giúp bảo vệ quyền lợi đối tác và thay thế các kênh liên lạc phân tán (Zalo, Email, điện thoại):</p>
+                        <ul class="routing-map-list">
+                            <li>
+                                <span class="map-icon"><i class="fa-solid fa-bolt-lightning"></i></span>
+                                <div>
+                                    <strong>Khởi tạo mã Ticket duy nhất tức thì</strong>
+                                    <span>Chống xung đột 100% ngay cả khi nhiều khách hàng gửi yêu cầu cùng lúc.</span>
+                                </div>
+                            </li>
+                            <li>
+                                <span class="map-icon"><i class="fa-solid fa-sitemap"></i></span>
+                                <div>
+                                    <strong>Luân chuyển đúng bộ phận dưới 05 phút</strong>
+                                    <span>Định tuyến tự động đến Đội điều độ, Hải quan, Quản lý kho hoặc Bộ phận chứng từ.</span>
+                                </div>
+                            </li>
+                            <li>
+                                <span class="map-icon"><i class="fa-solid fa-route"></i></span>
+                                <div>
+                                    <strong>Minh bạch 03 trạng thái xử lý</strong>
+                                    <span>Chủ động theo dõi: Đã tiếp nhận &rarr; Đang xử lý &rarr; Đã giải quyết hoàn tất.</span>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- LIÊN KẾT 2: THEO DÕI TIẾN ĐỘ XỬ LÝ (#tracking) -->
+        <section id="page-tracking" class="page-view">
+            <div class="page-banner">
+                <div>
+                    <span class="banner-tag"><i class="fa-solid fa-eye"></i> Minh bạch hóa lộ trình xử lý</span>
+                    <h2>Tra Cứu &amp; Theo Dõi Tiến Độ Sự Cố</h2>
+                    <p>Giám sát trực tiếp lộ trình giải quyết sự cố theo 03 trạng thái chuẩn hóa: <strong>Đã tiếp nhận &rarr; Đang xử lý &rarr; Đã giải quyết hoàn tất</strong>.</p>
+                </div>
+                <a href="#report" class="btn-banner-action" style="text-decoration:none;">
+                    <i class="fa-solid fa-plus"></i> Gửi yêu cầu mới
+                </a>
+            </div>
+
+            <div class="tracking-layout">
+                <div class="card-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h3><i class="fa-solid fa-magnifying-glass text-primary"></i> Danh Sách Yêu Cầu Trên Hệ Thống</h3>
+                            <p>Tra cứu theo Mã Ticket, Số Vận Đơn (B/L) hoặc Mã Booking.</p>
+                        </div>
+                    </div>
+
+                    <div class="search-bar">
+                        <div class="search-input-wrap">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="searchTicketInput" placeholder="Nhập mã Ticket (VD: #UIL-8492) hoặc Vận đơn...">
+                            <button type="button" id="btnClearSearch" class="btn-clear-search" hidden><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <button type="button" id="btnSearchTicket" class="btn-primary-search">Tra cứu</button>
+                    </div>
+
+                    <div class="filter-status-row" id="tracking-status-chips">
+                        <button type="button" class="status-chip active" data-status="all">Tất cả (<span id="count-status-all">0</span>)</button>
+                        <button type="button" class="status-chip" data-status="0">Đã tiếp nhận (<span id="count-status-0">0</span>)</button>
+                        <button type="button" class="status-chip" data-status="1">Đang xử lý (<span id="count-status-1">0</span>)</button>
+                        <button type="button" class="status-chip" data-status="2">Đã hoàn tất (<span id="count-status-2">0</span>)</button>
+                    </div>
+
+                    <div id="ticket-list-container" class="ticket-list"></div>
+                </div>
+
+                <div class="card-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h3><i class="fa-solid fa-route text-primary"></i> Chi Tiết Tiến Độ &amp; Phản Hồi Từ U&amp;I Logistics</h3>
+                            <p>Cập nhật tự động theo thời gian thực ngay khi Máy chủ CSKH phản hồi.</p>
+                        </div>
+                    </div>
+                    <div id="active-ticket-card" class="ticket-detail-card"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- LIÊN KẾT 3: HƯỚNG DẪN & HỖ TRỢ CSKH (#guide) -->
+        <section id="page-guide" class="page-view">
+            <div class="page-banner">
+                <div>
+                    <span class="banner-tag"><i class="fa-solid fa-handshake-angle"></i> Đồng hành cùng khách hàng</span>
+                    <h2>Hướng Dẫn Sử Dụng &amp; Hỗ Trợ Dịch Vụ Khách Hàng</h2>
+                    <p>Tài liệu hướng dẫn thao tác trên cổng tiếp nhận số hóa và thông tin liên hệ nhân viên chuyên trách Dịch vụ khách hàng (CS).</p>
+                </div>
+                <button type="button" id="download-guide-btn" class="btn-banner-action">
+                    <i class="fa-solid fa-file-arrow-down"></i> Tải Tài Liệu Hướng Dẫn (.HTML)
+                </button>
+            </div>
+
+            <div class="guide-grid">
+                <div class="card-panel">
+                    <div class="panel-header">
+                        <h3><i class="fa-solid fa-list-ol text-primary"></i> Quy Trình Thao Tác Báo Lỗi Nhanh (01 - 02 Phút)</h3>
+                    </div>
+                    <div class="guide-step-cards">
+                        <div class="g-step-card">
+                            <div class="g-step-num">01</div>
+                            <div>
+                                <h4>Khai báo thông tin tại mục "Báo cáo sự cố tức thì"</h4>
+                                <p>Chọn phân loại sự cố (trễ xe, vướng hải quan, sai sót chứng từ, hư hỏng hàng hóa, sự cố lưu kho), nhập mã vận đơn, booking và tải lên chứng từ/hình ảnh đính kèm.</p>
+                            </div>
+                        </div>
+                        <div class="g-step-card">
+                            <div class="g-step-num">02</div>
+                            <div>
+                                <h4>Nhận mã Ticket duy nhất</h4>
+                                <p>Hệ thống tự động khởi tạo mã Ticket duy nhất ngay khi gửi yêu cầu và chuyển thẳng đến bộ phận chuyên trách trong thời gian dưới 05 phút.</p>
+                            </div>
+                        </div>
+                        <div class="g-step-card">
+                            <div class="g-step-num">03</div>
+                            <div>
+                                <h4>Chủ động giám sát lộ trình xử lý</h4>
+                                <p>Tra cứu mã Ticket tại mục "Theo dõi tiến độ xử lý" để xem trực tiếp 03 trạng thái: <em>Đã tiếp nhận &rarr; Đang xử lý &rarr; Đã giải quyết hoàn tất</em>.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-panel">
+                    <div class="panel-header">
+                        <h3><i class="fa-solid fa-headset text-primary"></i> Kênh Hỗ Trợ Từ Bộ Phận Dịch Vụ Khách Hàng (CS)</h3>
+                    </div>
+                    <div class="cs-contact-cards">
+                        <div class="cs-card">
+                            <i class="fa-solid fa-phone-volume"></i>
+                            <div>
+                                <strong>Tổng Đài Hỗ Trợ Khách Hàng 24/7</strong>
+                                <p>Hotline: <b>1900 636 999</b> — Nhân viên CS trực tiếp hướng dẫn chuyển đổi số hóa</p>
+                            </div>
+                        </div>
+                        <div class="cs-card">
+                            <i class="fa-solid fa-envelope-open-text"></i>
+                            <div>
+                                <strong>Email Hỗ Trợ Cổng Thông Tin Khách Hàng</strong>
+                                <p>Địa chỉ: <b>cs-portal@unilogistics.vn</b> • Phản hồi trong vòng 15 phút</p>
+                            </div>
+                        </div>
+                        <div class="cs-card">
+                            <i class="fa-solid fa-lock"></i>
+                            <div>
+                                <strong>Bảo Mật Thông Tin Vận Đơn &amp; Chứng Từ</strong>
+                                <p>Toàn bộ dữ liệu giao dịch trên Customer Portal được áp dụng giao thức bảo mật nghiêm ngặt của U&amp;I Logistics.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MODAL XEM ĐÍNH KÈM -->
+    <div id="previewModal" class="modal-overlay" hidden>
+        <div class="modal-box">
+            <div class="modal-header">
+                <h4 id="previewModalTitle"><i class="fa-solid fa-file-lines"></i> Xem Tài Liệu Đính Kèm</h4>
+                <button type="button" id="btnClosePreviewModal" class="btn-close-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" id="previewModalBody"></div>
+            <div class="modal-footer">
+                <button type="button" id="btnDonePreviewModal" class="btn-secondary">Đóng</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container" class="toast-container"></div>
+
+    <footer class="footer">
+        <div class="container footer-content">
+            <p>© 2026 <strong>U&amp;I Logistics Corporation</strong> – Cổng Thông Tin Khách Hàng (Customer Portal).</p>
+            <span>Hotline CSKH: 1900 636 999 • Cam kết tiếp nhận dưới 05 phút</span>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

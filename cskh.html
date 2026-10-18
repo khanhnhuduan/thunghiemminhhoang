@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>U&I Logistics | Hệ Thống Máy Chủ CSKH & Điều Phối Sự Cố (CRM)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body data-portal="cskh">
+
+    <header class="navbar cskh-navbar">
+        <div class="container nav-container">
+            <a href="#inbox" class="brand">
+                <div class="brand-logo cskh-logo"><i class="fa-solid fa-server"></i></div>
+                <div class="brand-text">
+                    <h1>MÁY CHỦ CSKH &amp; CRM</h1>
+                    <span>U&amp;I Logistics • Trung Tâm Tiếp Nhận &amp; Phân Luồng Đa Thiết Bị</span>
+                </div>
+            </a>
+
+            <nav class="nav-links">
+                <a href="#inbox" class="nav-item active" data-page="inbox">
+                    <i class="fa-solid fa-inbox"></i> Tiếp nhận &amp; Xử lý trực tiếp
+                    <span class="nav-counter" id="cskh-pending-badge">0</span>
+                </a>
+                <a href="#departments" class="nav-item" data-page="departments">
+                    <i class="fa-solid fa-sitemap"></i> Phân luồng bộ phận chuyên trách
+                </a>
+                <a href="#analytics" class="nav-item" data-page="analytics">
+                    <i class="fa-solid fa-chart-pie"></i> Báo cáo SLA &amp; Điều kiện vận hành
+                </a>
+            </nav>
+
+            <div class="nav-actions">
+                <span class="realtime-indicator" id="netStatusBadge" title="Trạng thái nhận dữ liệu từ nhiều máy khách">
+                    <span class="pulse-dot"></span> <span id="netStatusText">Máy chủ: minhhoang (Online)</span>
+                </span>
+                <button type="button" id="btnResetDemo" class="btn-reset" title="Khôi phục dữ liệu mẫu mặc định">
+                    <i class="fa-solid fa-rotate-right"></i> Khôi phục mẫu
+                </button>
+                <button type="button" class="btn-reset" onclick="logoutPortal()" title="Đăng xuất khỏi máy chủ">
+                    <i class="fa-solid fa-right-from-bracket"></i> Đăng xuất
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container page-container">
+
+        <!-- BANNER BÁO ĐỘNG KHI CÓ KHÁCH HÀNG VỪA GỬI YÊU CẦU MỚI -->
+        <div id="realtime-incoming-banner" class="incoming-alert-banner" hidden></div>
+
+        <!-- LIÊN KẾT 1: TIẾP NHẬN & XỬ LÝ TRỰC TIẾP (#inbox) -->
+        <section id="page-inbox" class="page-view active">
+            <div class="dashboard-kpi-grid">
+                <div class="dash-kpi-card">
+                    <div class="dash-kpi-icon blue"><i class="fa-solid fa-satellite-dish"></i></div>
+                    <div>
+                        <span class="dash-kpi-label">Tổng Ticket tiếp nhận</span>
+                        <h3 id="cskh-total-count">0</h3>
+                        <small>Đồng bộ từ tất cả máy khách</small>
+                    </div>
+                </div>
+                <div class="dash-kpi-card">
+                    <div class="dash-kpi-icon amber"><i class="fa-solid fa-bell"></i></div>
+                    <div>
+                        <span class="dash-kpi-label">Mới tiếp nhận (Chờ xử lý)</span>
+                        <h3 id="cskh-new-count">0</h3>
+                        <small>Cam kết SLA &lt; 05 phút</small>
+                    </div>
+                </div>
+                <div class="dash-kpi-card">
+                    <div class="dash-kpi-icon purple"><i class="fa-solid fa-gears"></i></div>
+                    <div>
+                        <span class="dash-kpi-label">Đang xử lý</span>
+                        <h3 id="cskh-processing-count">0</h3>
+                        <small>Đang giải quyết tại bộ phận</small>
+                    </div>
+                </div>
+                <div class="dash-kpi-card">
+                    <div class="dash-kpi-icon green"><i class="fa-solid fa-circle-check"></i></div>
+                    <div>
+                        <span class="dash-kpi-label">Đã giải quyết hoàn tất</span>
+                        <h3 id="cskh-resolved-count">0</h3>
+                        <small>Đã nghiệm thu khách hàng</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-panel">
+                <div class="panel-header flex-between">
+                    <div>
+                        <h3><i class="fa-solid fa-tower-broadcast text-primary"></i> Bảng Điều Phối Yêu Cầu Trực Tiếp Từ Nhiều Máy Khách</h3>
+                        <p>Tự động hợp nhất không trùng lặp mọi Ticket gửi về từ các thiết bị. Nhấn <strong>"Xử lý / Phản hồi"</strong> để cập nhật trạng thái tức thì cho khách hàng.</p>
+                    </div>
+                    <div class="search-bar" style="margin-bottom:0;min-width:300px;">
+                        <div class="search-input-wrap">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="cskhSearchInput" placeholder="Lọc nhanh mã Ticket, Vận đơn, KH...">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="crm-table">
+                        <thead>
+                            <tr>
+                                <th>Mã Ticket</th>
+                                <th>Thời gian &amp; SLA</th>
+                                <th>Khách hàng / Liên hệ</th>
+                                <th>Vận Đơn / Booking</th>
+                                <th>Phân loại &amp; Nội dung sự cố</th>
+                                <th>Bộ phận chuyên trách</th>
+                                <th>Đính kèm</th>
+                                <th>Trạng thái (03 bước)</th>
+                                <th>Thao tác xử lý</th>
+                            </tr>
+                        </thead>
+                        <tbody id="crm-inbox-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- LIÊN KẾT 2: PHÂN LUỒNG BỘ PHẬN CHUYÊN TRÁCH (#departments) -->
+        <section id="page-departments" class="page-view">
+            <div class="page-banner">
+                <div>
+                    <span class="banner-tag"><i class="fa-solid fa-microchip"></i> Thuật toán phân luồng thông minh</span>
+                    <h2>Giao Diện Làm Việc Của Các Bộ Phận Chuyên Trách</h2>
+                    <p>Hệ thống tự động đẩy thông tin tức thời về đúng bộ phận phụ trách: Sự cố vận tải &rarr; Đội điều độ, Sự cố tờ khai &rarr; Bộ phận hải quan, Sự cố lưu kho/hàng hóa &rarr; Ban quản lý kho, Sai sót chứng từ &rarr; Bộ phận chứng từ &amp; CSKH.</p>
+                </div>
+            </div>
+
+            <div class="card-panel">
+                <div class="panel-header flex-between">
+                    <div>
+                        <h3><i class="fa-solid fa-sitemap text-primary"></i> Hàng Đợi Công Việc Theo Từng Đơn Vị Nghiệp Vụ</h3>
+                        <p>Chọn bộ phận chuyên trách bên dưới để kiểm tra các Ticket đã được định tuyến tự động về đơn vị đó.</p>
+                    </div>
+                    <div class="dept-filters" id="dept-filters"></div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="crm-table">
+                        <thead>
+                            <tr>
+                                <th>Mã Ticket</th>
+                                <th>Thời gian nhận</th>
+                                <th>Khách hàng</th>
+                                <th>Vận Đơn / Booking</th>
+                                <th>Danh mục lỗi chuẩn hóa</th>
+                                <th>Đơn vị phụ trách</th>
+                                <th>Ghi chú xử lý mới nhất</th>
+                                <th>Trạng thái</th>
+                                <th>Cập nhật</th>
+                            </tr>
+                        </thead>
+                        <tbody id="crm-dept-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- LIÊN KẾT 3: BÁO CÁO SLA & ĐIỀU KIỆN VẬN HÀNH (#analytics) -->
+        <section id="page-analytics" class="page-view">
+            <div class="page-banner">
+                <div>
+                    <span class="banner-tag"><i class="fa-solid fa-chart-line"></i> Quản trị hiệu suất 3PL</span>
+                    <h2>Báo Cáo Hiệu Quả Vận Hành &amp; Tiêu Chuẩn Hệ Thống CRM</h2>
+                    <p>Tổng hợp khối lượng xử lý theo phòng ban, các điều kiện vận hành hệ thống và hiệu quả thực tế mang lại cho doanh nghiệp.</p>
+                </div>
+            </div>
+
+            <div class="dashboard-grid">
+                <div class="card-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h3><i class="fa-solid fa-building-user text-primary"></i> Thống Kê Tỷ Lệ Phân Luồng &amp; Hoàn Tất Theo Bộ Phận</h3>
+                            <p>Biểu đồ khối lượng Ticket và tiến độ giải quyết tại từng bộ phận chuyên trách.</p>
+                        </div>
+                    </div>
+                    <div id="dept-stats-bars" class="dept-stats-bars"></div>
+                </div>
+
+                <div class="card-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h3><i class="fa-solid fa-gears text-primary"></i> Điều Kiện Thực Hiện &amp; Hiệu Quả Mang Lại</h3>
+                            <p>Các tiêu chuẩn kỹ thuật và nghiệp vụ đảm bảo hệ thống vận hành tối ưu.</p>
+                        </div>
+                    </div>
+                    <div class="condition-boxes">
+                        <div class="cond-item">
+                            <i class="fa-solid fa-server text-primary"></i>
+                            <div>
+                                <h5>Nâng cấp Customer Portal trên CRM &amp; Bảo mật</h5>
+                                <p>Phê duyệt ngân sách nâng cấp phân mục Customer Portal trên CRM, chuẩn hóa danh mục lỗi và áp dụng các giao thức bảo mật thông tin.</p>
+                            </div>
+                        </div>
+                        <div class="cond-item">
+                            <i class="fa-solid fa-users-gear text-primary"></i>
+                            <div>
+                                <h5>Tập huấn nghiệp vụ nhân sự &amp; Ban hành hướng dẫn</h5>
+                                <p>Tổ chức tập huấn nghiệp vụ cho nhân sự các khối liên quan (Điều độ, Hải quan, Kho vận, CSKH) và ban hành tài liệu hướng dẫn chuyển đổi cho khách hàng.</p>
+                            </div>
+                        </div>
+                        <div class="cond-item highlight-effect">
+                            <i class="fa-solid fa-award text-success"></i>
+                            <div>
+                                <h5>Tối ưu năng suất CSKH &amp; Khẳng định vị thế 3PL chuyên nghiệp</h5>
+                                <p>Tập trung hóa luồng thông tin đầu vào, rút ngắn thời gian tiếp nhận xuống dưới 05 phút, thao tác báo lỗi chỉ từ 1–2 phút và minh bạch hóa lộ trình xử lý.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MODAL CẬP NHẬT TRẠNG THÁI & GỬI PHẢN HỒI CHO KHÁCH HÀNG -->
+    <div id="statusModal" class="modal-overlay" hidden>
+        <div class="modal-box">
+            <div class="modal-header">
+                <h4><i class="fa-solid fa-pen-to-square"></i> Cập Nhật Tiến Độ &amp; Phản Hồi Khách Hàng</h4>
+                <button type="button" id="btnCloseModal" class="btn-close-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <div id="modalTicketSummary" class="modal-summary"></div>
+                <div class="form-group">
+                    <label for="modalStatusSelect">Trạng thái lộ trình chuẩn hóa (03 bước):</label>
+                    <select id="modalStatusSelect">
+                        <option value="0">1. Đã tiếp nhận</option>
+                        <option value="1">2. Đang xử lý</option>
+                        <option value="2">3. Đã giải quyết hoàn tất</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="modalNoteInput">Nội dung phản hồi / Biện pháp xử lý của bộ phận chuyên trách:</label>
+                    <textarea id="modalNoteInput" rows="3" placeholder="Nhập chi tiết phương án xử lý để đồng bộ sang màn hình tra cứu của khách hàng..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="btnCancelModal" class="btn-secondary">Hủy</button>
+                <button type="button" id="btnConfirmModal" class="btn-advance">
+                    <i class="fa-solid fa-check"></i> Lưu &amp; Đồng bộ sang Cổng Khách Hàng
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL XEM CHỨNG TỪ / HÌNH ẢNH KHÁCH HÀNG ĐÍNH KÈM -->
+    <div id="previewModal" class="modal-overlay" hidden>
+        <div class="modal-box">
+            <div class="modal-header">
+                <h4 id="previewModalTitle"><i class="fa-solid fa-file-lines"></i> Hồ Sơ Chứng Từ &amp; Hình Ảnh Đính Kèm</h4>
+                <button type="button" id="btnClosePreviewModal" class="btn-close-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" id="previewModalBody"></div>
+            <div class="modal-footer">
+                <button type="button" id="btnDonePreviewModal" class="btn-secondary">Đóng cửa sổ</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container" class="toast-container"></div>
+
+    <footer class="footer">
+        <div class="container footer-content">
+            <p>© 2026 <strong>U&amp;I Logistics Corporation</strong> – Hệ Thống Máy Chủ Quản Trị Sự Cố Nội Bộ (CRM Workspace).</p>
+            <span>Tài khoản máy chủ: minhhoang • Đồng bộ đa thiết bị thời gian thực</span>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

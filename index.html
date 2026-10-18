@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>U&I Logistics | Cổng Xác Thực Hệ Thống Tiếp Nhận Sự Cố Số Hóa</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body data-portal="auth" class="auth-body">
+
+    <div class="auth-wrapper">
+        <!-- HEADER THƯƠNG HIỆU -->
+        <div class="auth-brand-header">
+            <div class="brand-logo large-logo"><i class="fa-solid fa-ship"></i></div>
+            <h1>U&amp;I LOGISTICS CORPORATION</h1>
+            <p>Cổng Tiếp Nhận &amp; Phân Luồng Xử Lý Sự Cố Số Hóa Tập Trung (CRM Portal)</p>
+        </div>
+
+        <!-- MÀN HÌNH 1: HỎI VAI TRÒ (KHÁCH HÀNG HAY MÁY CHỦ) -->
+        <div id="role-selection-view" class="auth-card role-card">
+            <div class="auth-card-title">
+                <span class="tag-pill" style="background:#eff6ff;color:#0f3d7a;border-color:#bfdbfe;">
+                    <i class="fa-solid fa-tower-broadcast"></i> Đường truyền đồng bộ đa thiết bị: Ổn định 100%
+                </span>
+                <h2>Chào mừng bạn! Bạn đang truy cập với vai trò nào?</h2>
+                <p>Vui lòng chọn đúng phân quyền để hệ thống kết nối vào không gian làm việc tương ứng.</p>
+            </div>
+
+            <div class="role-grid">
+                <!-- LỰA CHỌN 1: KHÁCH HÀNG -->
+                <div class="role-option-box" id="btnChooseCustomer">
+                    <div class="role-icon customer-icon">
+                        <i class="fa-solid fa-building-user"></i>
+                    </div>
+                    <h3>Tôi là Khách Hàng / Đối Tác</h3>
+                    <p>Đăng nhập hoặc Đăng ký tài khoản để gửi yêu cầu xử lý sự cố lô hàng tức thì và theo dõi tiến độ 03 trạng thái công khai.</p>
+                    <span class="role-btn-text">Đăng nhập / Đăng ký Khách hàng <i class="fa-solid fa-arrow-right"></i></span>
+                </div>
+
+                <!-- LỰA CHỌN 2: MÁY CHỦ / CSKH -->
+                <div class="role-option-box server-box" id="btnChooseServer">
+                    <div class="role-icon server-icon">
+                        <i class="fa-solid fa-server"></i>
+                    </div>
+                    <h3>Tôi là Máy Chủ / Quản Trị CSKH</h3>
+                    <p>Dành riêng cho Máy chủ CSKH và các bộ phận chuyên trách tiếp nhận Ticket trực tiếp từ nhiều máy khách cùng lúc.</p>
+                    <span class="role-btn-text server-btn-text">Đăng nhập Máy chủ CSKH <i class="fa-solid fa-lock"></i></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- MÀN HÌNH 2: ĐĂNG NHẬP HOẶC ĐĂNG KÝ KHÁCH HÀNG -->
+        <div id="customer-auth-view" class="auth-card form-auth-card" hidden>
+            <button type="button" class="btn-back-role" onclick="showRoleSelection()">
+                <i class="fa-solid fa-arrow-left"></i> Quay lại chọn vai trò
+            </button>
+
+            <div class="auth-tabs">
+                <button type="button" class="auth-tab-btn active" id="tabBtnCustLogin" onclick="switchCustomerAuthTab('login')">
+                    <i class="fa-solid fa-right-to-bracket"></i> Đăng nhập
+                </button>
+                <button type="button" class="auth-tab-btn" id="tabBtnCustRegister" onclick="switchCustomerAuthTab('register')">
+                    <i class="fa-solid fa-user-plus"></i> Đăng ký mới
+                </button>
+            </div>
+
+            <!-- FORM ĐĂNG NHẬP KHÁCH HÀNG -->
+            <form id="customer-login-form" class="auth-form">
+                <div class="form-group">
+                    <label for="custLoginUser">Tên đăng nhập hoặc Email <span class="required">*</span></label>
+                    <input type="text" id="custLoginUser" placeholder="Nhập tên đăng nhập hoặc email..." required>
+                </div>
+                <div class="form-group">
+                    <label for="custLoginPass">Mật khẩu <span class="required">*</span></label>
+                    <div class="password-input-wrap">
+                        <input type="password" id="custLoginPass" placeholder="Nhập mật khẩu..." required>
+                        <button type="button" class="btn-toggle-pass" onclick="togglePasswordVisibility('custLoginPass', this)">
+                            <i class="fa-regular fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="remember-row">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="custRememberMe" checked>
+                        <span>Ghi nhớ tài khoản khách hàng trên thiết bị này</span>
+                    </label>
+                </div>
+                <small class="error-msg" id="custLoginError"></small>
+                <button type="submit" class="btn-submit">
+                    <i class="fa-solid fa-right-to-bracket"></i> Vào Cổng Khách Hàng
+                </button>
+                <div class="demo-account-hint">
+                    <span>Tài khoản mẫu có sẵn: TK: <code>khachhang</code> — MK: <code>1234</code> (Hoặc bấm tab <b>Đăng ký mới</b>)</span>
+                </div>
+            </form>
+
+            <!-- FORM ĐĂNG KÝ KHÁCH HÀNG MỚI -->
+            <form id="customer-register-form" class="auth-form" hidden>
+                <div class="form-group">
+                    <label for="regCompanyName">Tên Doanh nghiệp / Khách hàng <span class="required">*</span></label>
+                    <input type="text" id="regCompanyName" placeholder="VD: Công ty TNHH XNK Minh Phát" required>
+                </div>
+                <div class="form-group">
+                    <label for="regContact">Số điện thoại / Email liên hệ <span class="required">*</span></label>
+                    <input type="text" id="regContact" placeholder="VD: 0909 123 456 | ops@minhphat.vn" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="regUsername">Tên tài khoản <span class="required">*</span></label>
+                        <input type="text" id="regUsername" placeholder="VD: minhphat" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="regPassword">Mật khẩu <span class="required">*</span></label>
+                        <input type="password" id="regPassword" placeholder="Tạo mật khẩu..." required>
+                    </div>
+                </div>
+                <div class="remember-row">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="regRememberMe" checked>
+                        <span>Ghi nhớ đăng nhập và vào thẳng Cổng Khách Hàng</span>
+                    </label>
+                </div>
+                <small class="error-msg" id="custRegError"></small>
+                <button type="submit" class="btn-submit">
+                    <i class="fa-solid fa-user-check"></i> Đăng Ký &amp; Truy Cập Ngay
+                </button>
+            </form>
+        </div>
+
+        <!-- MÀN HÌNH 3: ĐĂNG NHẬP MÁY CHỦ CSKH (TK: minhhoang / MK: 1234) -->
+        <div id="server-auth-view" class="auth-card form-auth-card" hidden>
+            <button type="button" class="btn-back-role" onclick="showRoleSelection()">
+                <i class="fa-solid fa-arrow-left"></i> Quay lại chọn vai trò
+            </button>
+
+            <div class="server-auth-header">
+                <div class="role-icon server-icon" style="margin:0 auto 10px;">
+                    <i class="fa-solid fa-server"></i>
+                </div>
+                <h3>Đăng Nhập Máy Chủ CSKH &amp; Điều Phối CRM</h3>
+                <p>Dành cho Quản trị viên tiếp nhận yêu cầu trực tiếp từ khách hàng</p>
+            </div>
+
+            <form id="server-login-form" class="auth-form">
+                <div class="form-group">
+                    <label for="serverUsername">Tên tài khoản máy chủ <span class="required">*</span></label>
+                    <input type="text" id="serverUsername" placeholder="Nhập tên tài khoản máy chủ..." required>
+                </div>
+                <div class="form-group">
+                    <label for="serverPassword">Mật khẩu máy chủ <span class="required">*</span></label>
+                    <div class="password-input-wrap">
+                        <input type="password" id="serverPassword" placeholder="Nhập mật khẩu..." required>
+                        <button type="button" class="btn-toggle-pass" onclick="togglePasswordVisibility('serverPassword', this)">
+                            <i class="fa-regular fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="remember-row">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="serverRememberMe" checked>
+                        <span>Ghi nhớ tài khoản máy chủ trên thiết bị này</span>
+                    </label>
+                </div>
+                <small class="error-msg" id="serverLoginError"></small>
+                <button type="submit" class="btn-submit server-submit-btn">
+                    <i class="fa-solid fa-unlock-keyhole"></i> Truy Cập Hệ Thống Máy Chủ CSKH
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
