@@ -34,9 +34,12 @@
             </nav>
 
             <div class="nav-actions">
-                <span class="realtime-indicator" id="netStatusBadge" title="Trạng thái nhận dữ liệu từ nhiều máy khách">
-                    <span class="pulse-dot"></span> <span id="netStatusText">Máy chủ: minhhoang (Online)</span>
+                <span class="realtime-indicator" id="netStatusBadge" title="Trạng thái lưu trữ & đồng bộ">
+                    <span class="pulse-dot"></span> <span id="netStatusText">Máy chủ: minhhoang (Đã lưu tự động)</span>
                 </span>
+                <button type="button" id="btnClearResolved" class="btn-reset" title="Xóa nhanh các đơn đã giải quyết hoàn tất">
+                    <i class="fa-solid fa-broom"></i> Xóa đơn đã hoàn tất
+                </button>
                 <button type="button" id="btnResetDemo" class="btn-reset" title="Khôi phục dữ liệu mẫu mặc định">
                     <i class="fa-solid fa-rotate-right"></i> Khôi phục mẫu
                 </button>
@@ -58,9 +61,9 @@
                 <div class="dash-kpi-card">
                     <div class="dash-kpi-icon blue"><i class="fa-solid fa-satellite-dish"></i></div>
                     <div>
-                        <span class="dash-kpi-label">Tổng Ticket tiếp nhận</span>
+                        <span class="dash-kpi-label">Tổng đơn đang lưu trữ</span>
                         <h3 id="cskh-total-count">0</h3>
-                        <small>Đồng bộ từ tất cả máy khách</small>
+                        <small>Tự động lưu vĩnh viễn trên hệ thống</small>
                     </div>
                 </div>
                 <div class="dash-kpi-card">
@@ -92,8 +95,8 @@
             <div class="card-panel">
                 <div class="panel-header flex-between">
                     <div>
-                        <h3><i class="fa-solid fa-tower-broadcast text-primary"></i> Bảng Điều Phối Yêu Cầu Trực Tiếp Từ Nhiều Máy Khách</h3>
-                        <p>Tự động hợp nhất không trùng lặp mọi Ticket gửi về từ các thiết bị. Nhấn <strong>"Xử lý / Phản hồi"</strong> để cập nhật trạng thái tức thì cho khách hàng.</p>
+                        <h3><i class="fa-solid fa-tower-broadcast text-primary"></i> Danh Sách Đơn Đã Tiếp Nhận &amp; Lưu Trữ</h3>
+                        <p>Nhấn vào tên <strong>File đính kèm</strong> để mở xem trực tiếp hoặc tải về máy. Nhấn <strong>"Xử lý"</strong> để cập nhật hoặc <strong>"Xóa"</strong> để loại bỏ đơn.</p>
                     </div>
                     <div class="search-bar" style="margin-bottom:0;min-width:300px;">
                         <div class="search-input-wrap">
@@ -113,9 +116,9 @@
                                 <th>Vận Đơn / Booking</th>
                                 <th>Phân loại &amp; Nội dung sự cố</th>
                                 <th>Bộ phận chuyên trách</th>
-                                <th>Đính kèm</th>
+                                <th>Chứng từ / Hình ảnh (Nhấn để mở)</th>
                                 <th>Trạng thái (03 bước)</th>
-                                <th>Thao tác xử lý</th>
+                                <th>Thao tác quản lý</th>
                             </tr>
                         </thead>
                         <tbody id="crm-inbox-body"></tbody>
@@ -138,7 +141,7 @@
                 <div class="panel-header flex-between">
                     <div>
                         <h3><i class="fa-solid fa-sitemap text-primary"></i> Hàng Đợi Công Việc Theo Từng Đơn Vị Nghiệp Vụ</h3>
-                        <p>Chọn bộ phận chuyên trách bên dưới để kiểm tra các Ticket đã được định tuyến tự động về đơn vị đó.</p>
+                        <p>Chọn bộ phận chuyên trách bên dưới để kiểm tra, mở file chứng từ, cập nhật trạng thái hoặc xóa các Ticket tại đơn vị đó.</p>
                     </div>
                     <div class="dept-filters" id="dept-filters"></div>
                 </div>
@@ -152,10 +155,10 @@
                                 <th>Khách hàng</th>
                                 <th>Vận Đơn / Booking</th>
                                 <th>Danh mục lỗi chuẩn hóa</th>
-                                <th>Đơn vị phụ trách</th>
+                                <th>File đính kèm</th>
                                 <th>Ghi chú xử lý mới nhất</th>
                                 <th>Trạng thái</th>
-                                <th>Cập nhật</th>
+                                <th>Thao tác</th>
                             </tr>
                         </thead>
                         <tbody id="crm-dept-body"></tbody>
@@ -252,15 +255,15 @@
         </div>
     </div>
 
-    <!-- MODAL XEM CHỨNG TỪ / HÌNH ẢNH KHÁCH HÀNG ĐÍNH KÈM -->
+    <!-- MODAL XEM TRỰC TIẾP & TẢI FILE ĐÍNH KÈM (HỖ TRỢ ẢNH, PDF, WORD, EXCEL) -->
     <div id="previewModal" class="modal-overlay" hidden>
-        <div class="modal-box">
+        <div class="modal-box" style="max-width: 760px;">
             <div class="modal-header">
-                <h4 id="previewModalTitle"><i class="fa-solid fa-file-lines"></i> Hồ Sơ Chứng Từ &amp; Hình Ảnh Đính Kèm</h4>
+                <h4 id="previewModalTitle"><i class="fa-solid fa-file-lines"></i> Xem Chứng Từ &amp; Hình Ảnh Đính Kèm</h4>
                 <button type="button" id="btnClosePreviewModal" class="btn-close-modal"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="modal-body" id="previewModalBody"></div>
-            <div class="modal-footer">
+            <div class="modal-footer" id="previewModalFooter">
                 <button type="button" id="btnDonePreviewModal" class="btn-secondary">Đóng cửa sổ</button>
             </div>
         </div>
@@ -271,7 +274,7 @@
     <footer class="footer">
         <div class="container footer-content">
             <p>© 2026 <strong>U&amp;I Logistics Corporation</strong> – Hệ Thống Máy Chủ Quản Trị Sự Cố Nội Bộ (CRM Workspace).</p>
-            <span>Tài khoản máy chủ: minhhoang • Đồng bộ đa thiết bị thời gian thực</span>
+            <span>Tài khoản máy chủ: minhhoang • Lưu trữ bền vững &amp; Đồng bộ thời gian thực</span>
         </div>
     </footer>
 
