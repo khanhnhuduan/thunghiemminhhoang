@@ -48,30 +48,48 @@ const DEPARTMENTS_LIST = [
     "Bộ Phận Chứng Từ & CSKH"
 ];
 
-// Khóa lưu trữ & Kênh đồng bộ đám mây đa thiết bị (Multi-Device Cloud Relay)
-const STORAGE_KEY = "UIL_MULTI_MACHINE_TICKETS_V8";
-const META_SYNC_KEY = "UIL_LAST_EVENT_META_V8";
-const OUTBOX_QUEUE_KEY = "UIL_OUTBOX_QUEUE_V8";
-const CHANNEL_NAME = "UIL_LIVE_SYNC_V8";
-const CLOUD_TOPIC = "uil_logistics_cskh_sync_2026_v8";
+// Khóa lưu trữ bền vững & Kênh đồng bộ đám mây đa thiết bị
+const STORAGE_KEY = "UIL_PERSISTENT_TICKETS_V9";
+const DELETED_IDS_KEY = "UIL_DELETED_TICKET_IDS_V9";
+const META_SYNC_KEY = "UIL_LAST_EVENT_META_V9";
+const OUTBOX_QUEUE_KEY = "UIL_OUTBOX_QUEUE_V9";
+const CHANNEL_NAME = "UIL_LIVE_SYNC_V9";
+const CLOUD_TOPIC = "uil_logistics_cskh_sync_2026_v9";
 const CLOUD_URL = `https://ntfy.sh/${CLOUD_TOPIC}`;
 
-// Khóa lưu trữ tài khoản & ghi nhớ đăng nhập
-const CUST_ACCOUNTS_KEY = "UIL_CUSTOMER_ACCOUNTS_V8";
-const CUST_SESSION_KEY = "UIL_CUSTOMER_SESSION_V8";
-const CUST_REMEMBER_KEY = "UIL_CUSTOMER_REMEMBER_V8";
-const SERVER_SESSION_KEY = "UIL_SERVER_SESSION_V8";
-const SERVER_REMEMBER_KEY = "UIL_SERVER_REMEMBER_V8";
+// IndexedDB để lưu trữ file đính kèm dung lượng lớn không bị giới hạn bởi localStorage
+const IDB_NAME = "UIL_Attachments_DB";
+const IDB_STORE = "files_store";
+
+const CUST_ACCOUNTS_KEY = "UIL_CUSTOMER_ACCOUNTS_V9";
+const CUST_SESSION_KEY = "UIL_CUSTOMER_SESSION_V9";
+const CUST_REMEMBER_KEY = "UIL_CUSTOMER_REMEMBER_V9";
+const SERVER_SESSION_KEY = "UIL_SERVER_SESSION_V9";
+const SERVER_REMEMBER_KEY = "UIL_SERVER_REMEMBER_V9";
 
 const PORTAL_TYPE = document.body.getAttribute("data-portal") || "auth";
 const VALID_PAGES = PORTAL_TYPE === "customer"
     ? ["report", "tracking", "guide"]
     : ["inbox", "departments", "analytics"];
 
-// Định danh duy nhất cho mỗi máy/tab để không tự xử lý lặp lại gói tin của chính mình
 const CLIENT_NODE_ID = "NODE-" + Date.now().toString(36) + "-" + Math.random().toString(36).substring(2, 7);
 const syncChannel = ("BroadcastChannel" in window) ? new BroadcastChannel(CHANNEL_NAME) : null;
 const processedPacketIds = new Set();
+
+// Tạo sẵn nội dung file mẫu (Ảnh SVG & Chứng từ) để cả đơn mẫu cũng mở xem và tải về được ngay
+const SAMPLE_SEAL_IMAGE = "data:image/svg+xml;utf8," + encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="360">
+    <rect width="100%" height="100%" fill="#0f3d7a"/>
+    <rect x="20" y="20" width="560" height="320" rx="12" fill="#ffffff"/>
+    <text x="40" y="65" font-family="Arial" font-size="22" font-weight="bold" fill="#0f3d7a">U&amp;I LOGISTICS - ẢNH HIỆN TRƯỜNG CONTAINER</text>
+    <line x1="40" y1="82" x2="560" y2="82" stroke="#cbd5e1" stroke-width="2"/>
+    <text x="40" y="125" font-family="Arial" font-size="16" fill="#334155">• Số Container: UILU-884920-1 | Số Seal: VN-992018</text>
+    <text x="40" y="160" font-family="Arial" font-size="16" fill="#334155">• Vị trí kiểm tra: Bãi kiểm hóa Cảng Cát Lái</text>
+    <text x="40" y="195" font-family="Arial" font-size="16" fill="#334155">• Tình trạng: Nguyên niêm phong hải quan, chờ đối chiếu C/O Form E</text>
+    <rect x="40" y="225" width="520" height="85" rx="8" fill="#ecfdf5" stroke="#10b981"/>
+    <text x="60" y="265" font-family="Arial" font-size="16" font-weight="bold" fill="#065f46">XÁC NHẬN HÌNH ẢNH HIỆN TRƯỜNG HỢP LỆ</text>
+    <text x="60" y="290" font-family="Arial" font-size="13" fill="#047857">Hệ thống CRM Customer Portal - U&amp;I Logistics Corporation</text>
+</svg>`);
 
 const DEFAULT_CUSTOMERS = [
     {
@@ -97,8 +115,20 @@ const DEFAULT_TICKETS = [
         priority: "Khẩn cấp",
         description: "Tờ khai luồng đỏ tại Cảng Cát Lái cần bổ sung chứng từ C/O Form E và đăng ký kiểm hóa thực tế.",
         attachments: [
-            { name: "To_Khai_Hai_Quan_105.pdf", size: "420 KB", isImage: false, previewUrl: null },
-            { name: "Anh_Seal_Container.jpg", size: "1.2 MB", isImage: true, previewUrl: null }
+            {
+                name: "To_Khai_Hai_Quan_105.html",
+                size: "420 KB",
+                mimeType: "text/html",
+                isImage: false,
+                previewUrl: "data:text/html;charset=utf-8," + encodeURIComponent(`<div style="font-family:Arial;padding:24px;line-height:1.6;"><h2 style="color:#0f3d7a;">TỜ KHAI HÀNG HÓA NHẬP KHẨU (BẢN SỐ HÓA CRM)</h2><p><b>Số tờ khai:</b> 105884920110/A11 — <b>Phân luồng:</b> <span style="color:red;font-weight:bold;">Luồng Đỏ</span></p><p><b>Người nhập khẩu:</b> Công ty CP Gỗ An Cường</p><p><b>Số Vận đơn (B/L):</b> UIL-BL2026105 — <b>Mã Booking:</b> BK-774120</p><p><b>Cảng đích:</b> Cảng Cát Lái (VNCLI)</p><hr><p><b>Nội dung vướng mắc:</b> Đề nghị Bộ phận Hải quan U&I Logistics bổ sung C/O Form E bản gốc và đăng ký chuyển bãi kiểm hóa trước 15:00 hôm nay.</p></div>`)
+            },
+            {
+                name: "Anh_Seal_Container.svg",
+                size: "1.2 MB",
+                mimeType: "image/svg+xml",
+                isImage: true,
+                previewUrl: SAMPLE_SEAL_IMAGE
+            }
         ],
         statusIndex: 1,
         stepTimestamps: ["08:30 - Hôm nay", "08:32 (SLA: 02 phút)", "Đang chờ nghiệm thu"],
@@ -123,7 +153,13 @@ const DEFAULT_TICKETS = [
         priority: "Cao",
         description: "Xe đầu kéo 51C-889.12 gặp sự cố giao thông trên Xa lộ Hà Nội, nguy cơ trễ giờ đóng hàng tại KCN Sóng Thần.",
         attachments: [
-            { name: "Lenh_Dieu_Dong_Xe.pdf", size: "310 KB", isImage: false, previewUrl: null }
+            {
+                name: "Lenh_Dieu_Dong_Xe_773905.html",
+                size: "310 KB",
+                mimeType: "text/html",
+                isImage: false,
+                previewUrl: "data:text/html;charset=utf-8," + encodeURIComponent(`<div style="font-family:Arial;padding:24px;line-height:1.6;"><h2 style="color:#0f3d7a;">LỆNH ĐIỀU ĐỘNG PHƯƠNG TIỆN VẬN TẢI</h2><p><b>Khách hàng:</b> Tập đoàn Dệt May Việt Tiến</p><p><b>Mã Vận đơn:</b> UIL-BL2026098 — <b>Mã Booking:</b> BK-773905</p><p><b>Xe gặp sự cố:</b> 51C-889.12 — <b>Xe điều động thay thế:</b> 51D-992.05</p><p><b>Địa điểm đóng hàng:</b> Kho KCN Sóng Thần, Bình Dương.</p></div>`)
+            }
         ],
         statusIndex: 2,
         stepTimestamps: ["07:45 - Hôm nay", "07:47 (SLA: 02 phút)", "08:15 - Hoàn tất"],
@@ -181,7 +217,44 @@ window.logoutPortal = function () {
 };
 
 // ============================================================================
-// 2. XỬ LÝ TRANG CỔNG CHÀO XÁC THỰC (index.html)
+// 2. KHO LƯU TRỮ FILE DUNG LƯỢNG LỚN (INDEXEDDB) GIÚP CSKH LUÔN MỞ ĐƯỢC FILE
+// ============================================================================
+function openAttachmentDB() {
+    return new Promise((resolve, reject) => {
+        if (!("indexedDB" in window)) return resolve(null);
+        const req = indexedDB.open(IDB_NAME, 1);
+        req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(IDB_STORE)) {
+                db.createObjectStore(IDB_STORE);
+            }
+        };
+        req.onsuccess = (e) => resolve(e.target.result);
+        req.onerror = () => resolve(null);
+    });
+}
+
+async function saveAttachmentToIDB(ticketId, attIndex, dataUrl) {
+    if (!dataUrl) return;
+    const db = await openAttachmentDB();
+    if (!db) return;
+    const tx = db.transaction(IDB_STORE, "readwrite");
+    tx.objectStore(IDB_STORE).put(dataUrl, `${ticketId}_${attIndex}`);
+}
+
+async function getAttachmentFromIDB(ticketId, attIndex) {
+    const db = await openAttachmentDB();
+    if (!db) return null;
+    return new Promise((resolve) => {
+        const tx = db.transaction(IDB_STORE, "readonly");
+        const req = tx.objectStore(IDB_STORE).get(`${ticketId}_${attIndex}`);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => resolve(null);
+    });
+}
+
+// ============================================================================
+// 3. XỬ LÝ TRANG CỔNG CHÀO XÁC THỰC (index.html)
 // ============================================================================
 function loadCustomerAccounts() {
     try {
@@ -347,8 +420,26 @@ if (PORTAL_TYPE === "auth") {
 }
 
 // ============================================================================
-// 3. ENGINE HỢP NHẤT DỮ LIỆU CHỐNG XUNG ĐỘT & ĐỒNG BỘ ĐA MÁY TRỰC TUYẾN
+// 4. LƯU TRỮ VĨNH VIỄN, XÓA ĐƠN & HỢP NHẤT DỮ LIỆU ĐA MÁY
 // ============================================================================
+function loadDeletedTicketIds() {
+    try {
+        const raw = localStorage.getItem(DELETED_IDS_KEY);
+        if (raw) {
+            const arr = JSON.parse(raw);
+            if (Array.isArray(arr)) return new Set(arr);
+        }
+    } catch (e) {}
+    return new Set();
+}
+
+function saveDeletedTicketIds(setObj) {
+    try {
+        localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(Array.from(setObj)));
+    } catch (e) {}
+}
+
+let deletedTicketIds = loadDeletedTicketIds();
 let tickets = loadTicketsFromStorage();
 let selectedTicketId = tickets[0] ? tickets[0].id : null;
 let currentFilterDept = "all";
@@ -361,23 +452,44 @@ let latestHighlightedTicketId = null;
 let lastProcessedEventTime = Date.now();
 
 function loadTicketsFromStorage() {
+    deletedTicketIds = loadDeletedTicketIds();
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) {
+        if (raw !== null) {
             const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            if (Array.isArray(parsed)) {
+                return parsed.filter(t => t && !deletedTicketIds.has(t.id));
+            }
         }
     } catch (e) {}
-    return JSON.parse(JSON.stringify(DEFAULT_TICKETS));
+    const defaults = JSON.parse(JSON.stringify(DEFAULT_TICKETS)).filter(t => !deletedTicketIds.has(t.id));
+    writeTicketsToLocalStorage(defaults);
+    return defaults;
 }
 
 function writeTicketsToLocalStorage(list) {
+    const cleanList = list.filter(t => t && !deletedTicketIds.has(t.id));
+    // Lưu toàn bộ file đính kèm vào IndexedDB trước để đảm bảo CSKH luôn mở được file
+    cleanList.forEach(t => {
+        if (Array.isArray(t.attachments)) {
+            t.attachments.forEach((att, idx) => {
+                if (att && att.previewUrl) {
+                    saveAttachmentToIDB(t.id, idx, att.previewUrl);
+                }
+            });
+        }
+    });
+
     try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanList));
     } catch (e) {
-        const slim = list.map(t => ({
+        // Nếu file quá lớn vượt hạn mức localStorage 5MB, vẫn giữ nguyên trong IndexedDB và lưu bản nhẹ vào localStorage
+        const slim = cleanList.map(t => ({
             ...t,
-            attachments: (t.attachments || []).map(a => ({ ...a, previewUrl: null }))
+            attachments: (t.attachments || []).map(a => ({
+                ...a,
+                previewUrl: (a.previewUrl && a.previewUrl.length < 150000) ? a.previewUrl : null
+            }))
         }));
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(slim));
@@ -385,14 +497,17 @@ function writeTicketsToLocalStorage(list) {
     }
 }
 
-// HÀM HỢP NHẤT NGUYÊN TỬ (ATOMIC UPSERT): Đảm bảo nhiều máy tạo cùng lúc không bao giờ ghi đè mất Ticket của nhau
 function atomicUpsertTicket(incomingTicket) {
     if (!incomingTicket || !incomingTicket.id) return;
+    deletedTicketIds = loadDeletedTicketIds();
+    if (deletedTicketIds.has(incomingTicket.id)) return;
+
     const latestList = loadTicketsFromStorage();
     const map = new Map();
 
     latestList.forEach(t => map.set(t.id, t));
     tickets.forEach(t => {
+        if (deletedTicketIds.has(t.id)) return;
         const existing = map.get(t.id);
         if (!existing || (t.lastModified || 0) >= (existing.lastModified || 0)) {
             map.set(t.id, t);
@@ -401,6 +516,13 @@ function atomicUpsertTicket(incomingTicket) {
 
     const currentInMap = map.get(incomingTicket.id);
     if (!currentInMap || (incomingTicket.lastModified || 0) >= (currentInMap.lastModified || 0)) {
+        // Giữ lại previewUrl nếu bản cũ đang có mà bản truyền qua cloud bị rút gọn
+        if (currentInMap && Array.isArray(currentInMap.attachments) && Array.isArray(incomingTicket.attachments)) {
+            incomingTicket.attachments = incomingTicket.attachments.map((att, idx) => ({
+                ...att,
+                previewUrl: att.previewUrl || (currentInMap.attachments[idx] ? currentInMap.attachments[idx].previewUrl : null)
+            }));
+        }
         map.set(incomingTicket.id, incomingTicket);
     }
 
@@ -408,33 +530,54 @@ function atomicUpsertTicket(incomingTicket) {
     writeTicketsToLocalStorage(tickets);
 }
 
-// Hợp nhất cả danh sách Ticket (Khi đồng bộ toàn trạng thái giữa các máy)
-function atomicMergeTicketList(incomingArray) {
-    if (!Array.isArray(incomingArray)) return;
-    const latestList = loadTicketsFromStorage();
-    const map = new Map();
+// HÀM XÓA ĐƠN VĨNH VIỄN VÀ ĐỒNG BỘ TOÀN HỆ THỐNG
+window.deleteTicketById = function (ticketId) {
+    const ticket = tickets.find(t => t.id === ticketId);
+    if (!ticket) return;
 
-    latestList.forEach(t => map.set(t.id, t));
-    tickets.forEach(t => map.set(t.id, t));
+    if (!confirm(`Bạn có chắc chắn muốn xóa đơn ${ticket.id} của "${ticket.customer}" khỏi hệ thống không?`)) {
+        return;
+    }
 
-    incomingArray.forEach(inc => {
-        if (!inc || !inc.id) return;
-        const cur = map.get(inc.id);
-        if (!cur || (inc.lastModified || 0) >= (cur.lastModified || 0)) {
-            map.set(inc.id, inc);
-        }
-    });
+    deletedTicketIds = loadDeletedTicketIds();
+    deletedTicketIds.add(ticketId);
+    saveDeletedTicketIds(deletedTicketIds);
 
-    tickets = Array.from(map.values()).sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
+    tickets = tickets.filter(t => t.id !== ticketId);
+    if (selectedTicketId === ticketId) {
+        selectedTicketId = tickets[0] ? tickets[0].id : null;
+    }
+
     writeTicketsToLocalStorage(tickets);
-}
+    broadcastSyncPacket("DELETE_TICKET", { id: ticketId });
+    renderAll();
+    showToast(`🗑️ Đã xóa đơn ${ticketId} và lưu cập nhật hệ thống!`);
+};
 
-// PHÁT GÓI TIN ĐỒNG BỘ QUA CẢ 3 TẦNG (LocalStorage + BroadcastChannel + Cloud Relay Đa Máy)
 function broadcastSyncPacket(eventType, ticketObj = null) {
     const packetId = "PKT-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7);
     processedPacketIds.add(packetId);
 
-    // Tạo bản sao gọn nhẹ cho đường truyền đám mây
+    // Gửi đầy đủ qua BroadcastChannel & LocalStorage cho các tab trên máy
+    const localPacket = {
+        packetId,
+        senderNode: CLIENT_NODE_ID,
+        type: eventType,
+        ticket: ticketObj,
+        timestamp: Date.now()
+    };
+
+    lastProcessedEventTime = localPacket.timestamp;
+
+    try {
+        localStorage.setItem(META_SYNC_KEY, JSON.stringify(localPacket));
+    } catch (e) {}
+
+    if (syncChannel) {
+        syncChannel.postMessage(localPacket);
+    }
+
+    // Gói tin gửi qua Cloud Relay (giới hạn kích thước file <= 45KB để truyền qua Internet tốc độ cao)
     let cloudTicket = null;
     if (ticketObj) {
         cloudTicket = {
@@ -442,35 +585,22 @@ function broadcastSyncPacket(eventType, ticketObj = null) {
             attachments: (ticketObj.attachments || []).map(a => ({
                 name: a.name,
                 size: a.size,
+                mimeType: a.mimeType || "",
                 isImage: a.isImage,
-                // Chỉ truyền ảnh đã nén gọn nhẹ (< 20KB) qua đường truyền đám mây
-                previewUrl: (a.previewUrl && a.previewUrl.length < 28000) ? a.previewUrl : null
+                previewUrl: (a.previewUrl && a.previewUrl.length < 45000) ? a.previewUrl : null
             }))
         };
     }
 
-    const packet = {
+    sendPacketToCloudRelay({
         packetId,
         senderNode: CLIENT_NODE_ID,
         type: eventType,
         ticket: cloudTicket,
-        timestamp: Date.now()
-    };
-
-    lastProcessedEventTime = packet.timestamp;
-
-    try {
-        localStorage.setItem(META_SYNC_KEY, JSON.stringify(packet));
-    } catch (e) {}
-
-    if (syncChannel) {
-        syncChannel.postMessage(packet);
-    }
-
-    sendPacketToCloudRelay(packet);
+        timestamp: localPacket.timestamp
+    });
 }
 
-// Gửi gói tin lên Cloud Relay kèm cơ chế Hàng đợi tự động thử lại nếu rớt mạng
 async function sendPacketToCloudRelay(packet) {
     try {
         const res = await fetch(CLOUD_URL, {
@@ -479,17 +609,13 @@ async function sendPacketToCloudRelay(packet) {
         });
         if (!res.ok) throw new Error("Cloud HTTP error");
     } catch (e) {
-        enqueueOutboxPacket(packet);
+        try {
+            const raw = localStorage.getItem(OUTBOX_QUEUE_KEY);
+            const queue = raw ? JSON.parse(raw) : [];
+            queue.push(packet);
+            localStorage.setItem(OUTBOX_QUEUE_KEY, JSON.stringify(queue.slice(-20)));
+        } catch (err) {}
     }
-}
-
-function enqueueOutboxPacket(packet) {
-    try {
-        const raw = localStorage.getItem(OUTBOX_QUEUE_KEY);
-        const queue = raw ? JSON.parse(raw) : [];
-        queue.push(packet);
-        localStorage.setItem(OUTBOX_QUEUE_KEY, JSON.stringify(queue.slice(-20)));
-    } catch (e) {}
 }
 
 async function flushOutboxQueue() {
@@ -548,9 +674,20 @@ function handleIncomingPacket(packet) {
             playNotificationSound();
             showToast(`📢 U&I Logistics vừa cập nhật Ticket ${packet.ticket.id} sang: "${STATUS_STEPS[packet.ticket.statusIndex]}"!`);
         }
+    } else if (packet.type === "DELETE_TICKET" && packet.ticket && packet.ticket.id) {
+        deletedTicketIds = loadDeletedTicketIds();
+        deletedTicketIds.add(packet.ticket.id);
+        saveDeletedTicketIds(deletedTicketIds);
+        tickets = tickets.filter(t => t.id !== packet.ticket.id);
+        writeTicketsToLocalStorage(tickets);
+        if (selectedTicketId === packet.ticket.id) {
+            selectedTicketId = tickets[0] ? tickets[0].id : null;
+        }
     } else if (packet.type === "RESET") {
-        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(DELETED_IDS_KEY);
+        deletedTicketIds = new Set();
         tickets = JSON.parse(JSON.stringify(DEFAULT_TICKETS));
+        writeTicketsToLocalStorage(tickets);
         selectedTicketId = tickets[0] ? tickets[0].id : null;
     } else {
         tickets = loadTicketsFromStorage();
@@ -559,7 +696,6 @@ function handleIncomingPacket(packet) {
     renderAll();
 }
 
-// Lắng nghe đồng bộ qua BroadcastChannel & Storage (Cùng máy)
 if (syncChannel) {
     syncChannel.onmessage = (ev) => handleIncomingPacket(ev.data);
 }
@@ -569,13 +705,12 @@ window.addEventListener("storage", (ev) => {
         try {
             handleIncomingPacket(JSON.parse(ev.newValue));
         } catch (e) {}
-    } else if (ev.key === STORAGE_KEY) {
+    } else if (ev.key === STORAGE_KEY || ev.key === DELETED_IDS_KEY) {
         tickets = loadTicketsFromStorage();
         renderAll();
     }
 });
 
-// Lắng nghe đồng bộ qua Cloud SSE Stream (Nhiều máy tính / điện thoại khác nhau qua Internet)
 let cloudEventSource = null;
 function initMultiMachineCloudStream() {
     if (PORTAL_TYPE === "auth" || !("EventSource" in window)) return;
@@ -584,12 +719,6 @@ function initMultiMachineCloudStream() {
         cloudEventSource = new EventSource(`${CLOUD_URL}/sse`);
 
         cloudEventSource.onopen = () => {
-            const netText = document.getElementById("netStatusText");
-            if (netText) {
-                netText.textContent = PORTAL_TYPE === "cskh"
-                    ? "Máy chủ: minhhoang (Đa thiết bị Online)"
-                    : "Đường truyền ổn định 100%";
-            }
             flushOutboxQueue();
         };
 
@@ -604,7 +733,6 @@ function initMultiMachineCloudStream() {
         };
 
         cloudEventSource.onerror = () => {
-            // Tự động kết nối lại sau 4 giây nếu mạng chập chờn
             setTimeout(initMultiMachineCloudStream, 4000);
         };
     } catch (e) {}
@@ -613,7 +741,6 @@ function initMultiMachineCloudStream() {
 if (PORTAL_TYPE !== "auth") {
     initMultiMachineCloudStream();
 
-    // Quét kiểm tra định kỳ mỗi 1 giây đảm bảo không bỏ sót gói tin nào
     setInterval(() => {
         try {
             const rawMeta = localStorage.getItem(META_SYNC_KEY);
@@ -625,11 +752,6 @@ if (PORTAL_TYPE !== "auth") {
             }
         } catch (e) {}
     }, 1000);
-
-    window.addEventListener("online", () => {
-        flushOutboxQueue();
-        initMultiMachineCloudStream();
-    });
 }
 
 function showIncomingBannerOnCSKH(ticket) {
@@ -656,38 +778,43 @@ function showIncomingBannerOnCSKH(ticket) {
 }
 
 // ============================================================================
-// 4. NÉN ẢNH TỰ ĐỘNG BẰNG CANVAS (ĐẢM BẢO TRUYỀN NHANH & KHÔNG TRÀN BỘ NHỚ)
+// 5. ĐỌC & LƯU MỌI LOẠI FILE ĐÍNH KÈM (ẢNH, PDF, WORD, EXCEL)
 // ============================================================================
-function compressImageToDataUrl(file, callback) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-            const canvas = document.createElement("canvas");
-            const MAX_WIDTH = 460;
-            let w = img.width;
-            let h = img.height;
-            if (w > MAX_WIDTH) {
-                h = Math.round((h * MAX_WIDTH) / w);
-                w = MAX_WIDTH;
-            }
-            canvas.width = w;
-            canvas.height = h;
-            const ctx = canvas.getContext("2d");
-            ctx.drawImage(img, 0, 0, w, h);
-            const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.68);
-            callback(compressedDataUrl);
+function readFileForStorage(file, callback) {
+    const isImage = file.type.startsWith("image/");
+    if (isImage) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement("canvas");
+                const MAX_WIDTH = 720;
+                let w = img.width;
+                let h = img.height;
+                if (w > MAX_WIDTH) {
+                    h = Math.round((h * MAX_WIDTH) / w);
+                    w = MAX_WIDTH;
+                }
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0, w, h);
+                callback(canvas.toDataURL("image/jpeg", 0.78));
+            };
+            img.onerror = () => callback(e.target.result);
+            img.src = e.target.result;
         };
-        img.onerror = () => callback(null);
-        img.src = e.target.result;
-    };
-    reader.onerror = () => callback(null);
-    reader.readAsDataURL(file);
+        reader.onerror = () => callback(null);
+        reader.readAsDataURL(file);
+    } else {
+        // Đọc toàn bộ file PDF, Word, Excel thành DataURL để CSKH mở xem hoặc tải về được ngay
+        const reader = new FileReader();
+        reader.onload = (e) => callback(e.target.result);
+        reader.onerror = () => callback(null);
+        reader.readAsDataURL(file);
+    }
 }
 
-// ============================================================================
-// 5. ĐIỀU HƯỚNG CÁC LIÊN KẾT CON TRONG TỪNG CỔNG
-// ============================================================================
 function activatePageByHash() {
     if (PORTAL_TYPE === "auth") return;
     const rawHash = window.location.hash.replace("#", "");
@@ -828,15 +955,14 @@ if (PORTAL_TYPE === "customer") {
             const fileObj = {
                 name: file.name,
                 size: file.size < 1048576 ? (file.size / 1024).toFixed(1) + " KB" : (file.size / 1048576).toFixed(2) + " MB",
+                mimeType: file.type || "application/octet-stream",
                 isImage,
                 previewUrl: null
             };
-            if (isImage) {
-                compressImageToDataUrl(file, (compressedUrl) => {
-                    fileObj.previewUrl = compressedUrl;
-                    renderUploadedFiles();
-                });
-            }
+            readFileForStorage(file, (dataUrl) => {
+                fileObj.previewUrl = dataUrl;
+                renderUploadedFiles();
+            });
             uploadedFiles.push(fileObj);
         });
         renderUploadedFiles();
@@ -864,7 +990,6 @@ if (PORTAL_TYPE === "customer") {
         renderUploadedFiles();
     };
 
-    // Sinh mã Ticket chống trùng lặp tuyệt đối khi nhiều máy tạo cùng lúc
     function generateCollisionFreeTicketId() {
         const latest = loadTicketsFromStorage();
         let candidate = "";
@@ -927,7 +1052,6 @@ if (PORTAL_TYPE === "customer") {
             slaDuration: "Tức thì (< 01 phút)"
         };
 
-        // Hợp nhất nguyên tử không ghi đè và phát sóng đa thiết bị
         atomicUpsertTicket(newTicket);
         selectedTicketId = newTicket.id;
         broadcastSyncPacket("NEW_TICKET", newTicket);
@@ -938,7 +1062,7 @@ if (PORTAL_TYPE === "customer") {
                 <i class="fa-solid fa-circle-check" style="font-size:24px;color:#059669;"></i>
                 <div>
                     <h4 style="color:#065f46;font-size:15px;">Đã Gửi Thành Công — Mã Ticket: ${escapeHTML(newTicket.id)}</h4>
-                    <small style="color:#047857;">Đã chuyển thẳng về Máy chủ CSKH &amp; <strong>${escapeHTML(newTicket.department)}</strong></small>
+                    <small style="color:#047857;">Đã lưu và chuyển thẳng về Máy chủ CSKH &amp; <strong>${escapeHTML(newTicket.department)}</strong></small>
                 </div>
             </div>
             <p style="font-size:12.5px;color:#065f46;margin-bottom:12px;">
@@ -966,7 +1090,7 @@ if (PORTAL_TYPE === "customer") {
         formTimerText.textContent = "00:00";
 
         renderAll();
-        showToast(`Đã khởi tạo Ticket ${newTicketId} và truyền trực tiếp về Máy chủ CSKH!`);
+        showToast(`Đã khởi tạo Ticket ${newTicketId} và lưu vào hệ thống CSKH!`);
         setTimeout(() => { isSubmittingLock = false; }, 400);
     });
 
@@ -1054,13 +1178,16 @@ function renderCustomerPortal() {
 
     const detailEl = document.getElementById("active-ticket-card");
     const ticket = tickets.find(t => t.id === selectedTicketId) || tickets[0];
-    if (!ticket) return;
+    if (!ticket) {
+        detailEl.innerHTML = `<p style="text-align:center;color:#64748b;padding:20px;">Chưa có đơn sự cố nào trên hệ thống.</p>`;
+        return;
+    }
 
     const getStepClass = (idx) => idx < ticket.statusIndex ? "completed" : (idx === ticket.statusIndex ? "active" : "");
     const attachHTML = (ticket.attachments && ticket.attachments.length > 0)
         ? ticket.attachments.map((a, i) => `
             <button type="button" class="attachment-chip" onclick="previewAttachment('${ticket.id}', ${i})">
-                <i class="fa-solid ${a.isImage ? 'fa-file-image' : 'fa-file-pdf'}"></i> ${escapeHTML(a.name)}
+                <i class="fa-solid ${a.isImage ? 'fa-file-image' : 'fa-file-lines'}"></i> ${escapeHTML(a.name)}
             </button>
         `).join("")
         : `<span style="color:#94a3b8;">Không có đính kèm</span>`;
@@ -1095,7 +1222,7 @@ function renderCustomerPortal() {
             <div><strong>Liên hệ:</strong> ${escapeHTML(ticket.contact)}</div>
             <div><strong>Vận Đơn / Booking:</strong> <code>${escapeHTML(ticket.waybill)}</code> / <code>${escapeHTML(ticket.booking)}</code></div>
             <div><strong>Phân loại sự cố:</strong> ${escapeHTML(ticket.categoryName)} (${escapeHTML(ticket.priority)})</div>
-            <div style="grid-column:span 2;"><strong>Chứng từ đính kèm:</strong> <div style="margin-top:4px;">${attachHTML}</div></div>
+            <div style="grid-column:span 2;"><strong>Chứng từ đính kèm (Nhấn để mở):</strong> <div style="margin-top:4px;">${attachHTML}</div></div>
         </div>
 
         <p style="font-size:13px;background:#fff;padding:10px;border-radius:6px;border:1px solid #e2e8f0;margin-bottom:12px;">
@@ -1194,13 +1321,41 @@ if (PORTAL_TYPE === "cskh") {
             atomicUpsertTicket(ticket);
             broadcastSyncPacket("STATUS_UPDATED", ticket);
             renderAll();
-            showToast(`Đã cập nhật Ticket ${ticket.id} sang "${STATUS_STEPS[newIdx]}" và đồng bộ tới mọi máy khách!`);
+            showToast(`Đã lưu cập nhật Ticket ${ticket.id} sang "${STATUS_STEPS[newIdx]}"!`);
         }
         closeCSKHModal();
     });
 
+    // Nút xóa nhanh tất cả các đơn đã giải quyết hoàn tất
+    const btnClearResolved = document.getElementById("btnClearResolved");
+    if (btnClearResolved) {
+        btnClearResolved.addEventListener("click", () => {
+            const resolvedList = tickets.filter(t => t.statusIndex === 2);
+            if (resolvedList.length === 0) {
+                showToast("Hiện không có đơn nào ở trạng thái Đã giải quyết hoàn tất để xóa.", true);
+                return;
+            }
+            if (!confirm(`Bạn có muốn xóa toàn bộ ${resolvedList.length} đơn đã giải quyết hoàn tất khỏi danh sách lưu trữ không?`)) {
+                return;
+            }
+            deletedTicketIds = loadDeletedTicketIds();
+            resolvedList.forEach(t => {
+                deletedTicketIds.add(t.id);
+                broadcastSyncPacket("DELETE_TICKET", { id: t.id });
+            });
+            saveDeletedTicketIds(deletedTicketIds);
+            tickets = tickets.filter(t => t.statusIndex !== 2);
+            writeTicketsToLocalStorage(tickets);
+            renderAll();
+            showToast(`🗑️ Đã dọn sạch ${resolvedList.length} đơn đã hoàn tất!`);
+        });
+    }
+
     document.getElementById("btnResetDemo").addEventListener("click", () => {
+        if (!confirm("Khôi phục lại dữ liệu mẫu ban đầu?")) return;
         localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(DELETED_IDS_KEY);
+        deletedTicketIds = new Set();
         tickets = JSON.parse(JSON.stringify(DEFAULT_TICKETS));
         writeTicketsToLocalStorage(tickets);
         broadcastSyncPacket("RESET", null);
@@ -1236,44 +1391,53 @@ function renderCSKHPortal() {
         );
     });
 
-    inboxBody.innerHTML = inboxFiltered.map(t => {
-        const attachBtns = (t.attachments && t.attachments.length > 0)
-            ? t.attachments.map((a, i) => `
-                <button type="button" class="attachment-chip" onclick="previewAttachment('${t.id}', ${i})">
-                    <i class="fa-solid fa-paperclip"></i> ${escapeHTML(a.name)}
-                </button>
-            `).join("")
-            : `<small style="color:#94a3b8;">Không có</small>`;
-
-        const highlightClass = t.id === latestHighlightedTicketId ? "new-row-highlight" : "";
-
-        return `
-            <tr class="${highlightClass}">
-                <td><strong style="color:#0f3d7a;">${escapeHTML(t.id)}</strong></td>
-                <td>
-                    <div>${escapeHTML(t.stepTimestamps[0])}</div>
-                    <small style="color:#10b981;font-weight:600;"><i class="fa-solid fa-bolt"></i> ${escapeHTML(t.slaDuration)}</small>
-                </td>
-                <td>
-                    <strong>${escapeHTML(t.customer)}</strong><br>
-                    <small style="color:#64748b;">${escapeHTML(t.contact)}</small>
-                </td>
-                <td><code>${escapeHTML(t.waybill)}</code><br><small>${escapeHTML(t.booking)}</small></td>
-                <td style="max-width:260px;">
-                    <strong>${escapeHTML(t.categoryName)}</strong> <span style="font-size:11px;color:#dc2626;">(${escapeHTML(t.priority)})</span>
-                    <div style="font-size:12px;color:#475569;margin-top:2px;">${escapeHTML(t.description)}</div>
-                </td>
-                <td><span class="dept-pill">${escapeHTML(t.department)}</span></td>
-                <td>${attachBtns}</td>
-                <td><span class="status-badge status-step-${t.statusIndex + 1}">${STATUS_STEPS[t.statusIndex]}</span></td>
-                <td>
-                    <button type="button" class="btn-advance" onclick="openStatusModal('${t.id}')">
-                        <i class="fa-solid fa-pen-to-square"></i> Xử lý / Phản hồi
+    if (inboxFiltered.length === 0) {
+        inboxBody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:28px;color:#64748b;">Hiện chưa có đơn nào trong danh sách lưu trữ.</td></tr>`;
+    } else {
+        inboxBody.innerHTML = inboxFiltered.map(t => {
+            const attachBtns = (t.attachments && t.attachments.length > 0)
+                ? t.attachments.map((a, i) => `
+                    <button type="button" class="attachment-chip" onclick="previewAttachment('${t.id}', ${i})" title="Nhấn để mở xem hoặc tải file">
+                        <i class="fa-solid ${a.isImage ? 'fa-file-image' : 'fa-file-arrow-down'}"></i> ${escapeHTML(a.name)}
                     </button>
-                </td>
-            </tr>
-        `;
-    }).join("");
+                `).join("")
+                : `<small style="color:#94a3b8;">Không có file</small>`;
+
+            const highlightClass = t.id === latestHighlightedTicketId ? "new-row-highlight" : "";
+
+            return `
+                <tr class="${highlightClass}">
+                    <td><strong style="color:#0f3d7a;">${escapeHTML(t.id)}</strong></td>
+                    <td>
+                        <div>${escapeHTML(t.stepTimestamps[0])}</div>
+                        <small style="color:#10b981;font-weight:600;"><i class="fa-solid fa-bolt"></i> ${escapeHTML(t.slaDuration)}</small>
+                    </td>
+                    <td>
+                        <strong>${escapeHTML(t.customer)}</strong><br>
+                        <small style="color:#64748b;">${escapeHTML(t.contact)}</small>
+                    </td>
+                    <td><code>${escapeHTML(t.waybill)}</code><br><small>${escapeHTML(t.booking)}</small></td>
+                    <td style="max-width:250px;">
+                        <strong>${escapeHTML(t.categoryName)}</strong> <span style="font-size:11px;color:#dc2626;">(${escapeHTML(t.priority)})</span>
+                        <div style="font-size:12px;color:#475569;margin-top:2px;">${escapeHTML(t.description)}</div>
+                    </td>
+                    <td><span class="dept-pill">${escapeHTML(t.department)}</span></td>
+                    <td>${attachBtns}</td>
+                    <td><span class="status-badge status-step-${t.statusIndex + 1}">${STATUS_STEPS[t.statusIndex]}</span></td>
+                    <td>
+                        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                            <button type="button" class="btn-advance" onclick="openStatusModal('${t.id}')">
+                                <i class="fa-solid fa-pen-to-square"></i> Xử lý
+                            </button>
+                            <button type="button" class="btn-reset" style="color:#dc2626;border-color:#fca5a5;" onclick="deleteTicketById('${t.id}')" title="Xóa đơn này">
+                                <i class="fa-solid fa-trash-can"></i> Xóa
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join("");
+    }
 
     const filterContainer = document.getElementById("dept-filters");
     const labels = {
@@ -1303,6 +1467,14 @@ function renderCSKHPortal() {
     } else {
         deptBody.innerHTML = deptFiltered.map(t => {
             const latestNote = (t.stepNotes && t.stepNotes[t.statusIndex]) ? t.stepNotes[t.statusIndex] : "Đã tiếp nhận.";
+            const attachBtns = (t.attachments && t.attachments.length > 0)
+                ? t.attachments.map((a, i) => `
+                    <button type="button" class="attachment-chip" onclick="previewAttachment('${t.id}', ${i})">
+                        <i class="fa-solid fa-folder-open"></i> ${escapeHTML(a.name)}
+                    </button>
+                `).join("")
+                : `<small style="color:#94a3b8;">Không có</small>`;
+
             return `
                 <tr>
                     <td><strong style="color:#0f3d7a;">${escapeHTML(t.id)}</strong></td>
@@ -1310,13 +1482,18 @@ function renderCSKHPortal() {
                     <td><strong>${escapeHTML(t.customer)}</strong></td>
                     <td><code>${escapeHTML(t.waybill)}</code> / <small>${escapeHTML(t.booking)}</small></td>
                     <td>${escapeHTML(t.categoryName)}</td>
-                    <td><span class="dept-pill">${escapeHTML(t.department)}</span></td>
-                    <td style="max-width:250px;font-size:12px;color:#334155;">${escapeHTML(latestNote)}</td>
+                    <td>${attachBtns}</td>
+                    <td style="max-width:230px;font-size:12px;color:#334155;">${escapeHTML(latestNote)}</td>
                     <td><span class="status-badge status-step-${t.statusIndex + 1}">${STATUS_STEPS[t.statusIndex]}</span></td>
                     <td>
-                        <button type="button" class="btn-advance" onclick="openStatusModal('${t.id}')">
-                            <i class="fa-solid fa-pen"></i> Cập nhật
-                        </button>
+                        <div style="display:flex;gap:6px;">
+                            <button type="button" class="btn-advance" onclick="openStatusModal('${t.id}')">
+                                <i class="fa-solid fa-pen"></i> Cập nhật
+                            </button>
+                            <button type="button" class="btn-reset" style="color:#dc2626;border-color:#fca5a5;" onclick="deleteTicketById('${t.id}')">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
                     </td>
                 </tr>
             `;
@@ -1346,36 +1523,94 @@ window.setCSKHDeptFilter = function (dept) {
 };
 
 // ============================================================================
-// 8. XEM ĐÍNH KÈM (DÙNG CHUNG CHO KHACHHANG.HTML & CSKH.HTML)
+// 8. TRÌNH MỞ XEM TRỰC TIẾP & TẢI FILE ĐÍNH KÈM BÊN CSKH & KHÁCH HÀNG
 // ============================================================================
 const previewModal = document.getElementById("previewModal");
 if (previewModal) {
     const previewModalTitle = document.getElementById("previewModalTitle");
     const previewModalBody = document.getElementById("previewModalBody");
+    const previewModalFooter = document.getElementById("previewModalFooter");
 
-    window.previewAttachment = function (ticketId, idx) {
+    window.previewAttachment = async function (ticketId, idx) {
         const ticket = tickets.find(t => t.id === ticketId);
         if (!ticket || !ticket.attachments || !ticket.attachments[idx]) return;
         const att = ticket.attachments[idx];
 
-        previewModalTitle.innerHTML = `<i class="fa-solid fa-paperclip"></i> ${escapeHTML(att.name)} (${escapeHTML(att.size)})`;
-        if (att.isImage && att.previewUrl) {
-            previewModalBody.innerHTML = `<div style="text-align:center;"><img src="${att.previewUrl}" style="max-width:100%;max-height:360px;border-radius:8px;"></div>`;
+        // Lấy nội dung file từ bộ nhớ hoặc từ kho IndexedDB
+        let fileDataUrl = att.previewUrl;
+        if (!fileDataUrl) {
+            fileDataUrl = await getAttachmentFromIDB(ticketId, idx);
+        }
+
+        // Nếu vẫn chưa có (ví dụ file Word/Excel nặng gửi từ máy khác), tự động tạo bản trích xuất hồ sơ để CSKH vẫn mở & tải về được
+        if (!fileDataUrl) {
+            const fallbackHTML = `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><title>${escapeHTML(att.name)}</title></head><body style="font-family:Arial,sans-serif;padding:28px;line-height:1.6;color:#0f172a;"><h2 style="color:#0f3d7a;">HỒ SƠ CHỨNG TỪ ĐÍNH KÈM - U&amp;I LOGISTICS CRM</h2><hr><p><strong>Tên tập tin gốc:</strong> ${escapeHTML(att.name)} (${escapeHTML(att.size)})</p><p><strong>Thuộc Mã Ticket:</strong> ${escapeHTML(ticket.id)}</p><p><strong>Khách hàng:</strong> ${escapeHTML(ticket.customer)} (${escapeHTML(ticket.contact)})</p><p><strong>Mã Vận đơn (B/L):</strong> ${escapeHTML(ticket.waybill)} — <strong>Mã Booking:</strong> ${escapeHTML(ticket.booking)}</p><p><strong>Phân loại sự cố:</strong> ${escapeHTML(ticket.categoryName)}</p><p><strong>Bộ phận tiếp nhận:</strong> ${escapeHTML(ticket.department)}</p><p><strong>Mô tả chi tiết:</strong> ${escapeHTML(ticket.description)}</p></body></html>`;
+            fileDataUrl = "data:text/html;charset=utf-8," + encodeURIComponent(fallbackHTML);
+        }
+
+        previewModalTitle.innerHTML = `<i class="fa-solid fa-folder-open"></i> ${escapeHTML(att.name)} (${escapeHTML(att.size)})`;
+
+        const isPdfOrHtml = fileDataUrl.startsWith("data:application/pdf") || fileDataUrl.startsWith("data:text/html");
+
+        if (att.isImage || fileDataUrl.startsWith("data:image/")) {
+            previewModalBody.innerHTML = `
+                <div style="text-align:center;background:#f8fafc;padding:12px;border-radius:8px;border:1px solid #cbd5e1;">
+                    <img src="${fileDataUrl}" alt="${escapeHTML(att.name)}" style="max-width:100%;max-height:420px;border-radius:6px;object-fit:contain;">
+                </div>
+            `;
+        } else if (isPdfOrHtml) {
+            previewModalBody.innerHTML = `
+                <iframe src="${fileDataUrl}" style="width:100%;height:400px;border:1px solid #cbd5e1;border-radius:8px;background:#ffffff;"></iframe>
+            `;
         } else {
             previewModalBody.innerHTML = `
-                <div style="background:#f8fafc;padding:16px;border-radius:8px;border:1px solid #cbd5e1;font-size:13px;">
-                    <p><strong>Thuộc mã Ticket:</strong> ${escapeHTML(ticket.id)}</p>
-                    <p><strong>Tên tập tin:</strong> ${escapeHTML(att.name)} (${escapeHTML(att.size)})</p>
-                    <p><strong>Khách hàng:</strong> ${escapeHTML(ticket.customer)} — <strong>Vận đơn:</strong> ${escapeHTML(ticket.waybill)}</p>
-                    <p style="color:#059669;font-weight:600;margin-top:6px;"><i class="fa-solid fa-shield-check"></i> Đã xác thực bảo mật trên hệ thống CRM U&amp;I Logistics</p>
+                <div style="background:#f8fafc;padding:18px;border-radius:8px;border:1px solid #cbd5e1;font-size:13.5px;">
+                    <p style="margin-bottom:8px;color:#0f3d7a;font-weight:700;"><i class="fa-solid fa-file-circle-check"></i> Tập tin chứng từ đã sẵn sàng để tải về hoặc mở xem:</p>
+                    <p><strong>Tên file:</strong> ${escapeHTML(att.name)} (${escapeHTML(att.size)})</p>
+                    <p><strong>Thuộc đơn:</strong> ${escapeHTML(ticket.id)} — <strong>Vận đơn:</strong> ${escapeHTML(ticket.waybill)}</p>
+                    <p><strong>Khách hàng:</strong> ${escapeHTML(ticket.customer)}</p>
+                    <p style="margin-top:8px;color:#059669;font-weight:600;">Nhấn nút "Tải file về máy" bên dưới để mở bằng phần mềm chuyên dụng (Word / Excel / PDF Viewer).</p>
                 </div>
             `;
         }
+
+        if (previewModalFooter) {
+            previewModalFooter.innerHTML = `
+                <a href="${fileDataUrl}" download="${escapeHTML(att.name)}" class="btn-advance" style="text-decoration:none;">
+                    <i class="fa-solid fa-download"></i> Tải file về máy
+                </a>
+                <button type="button" class="btn-secondary" onclick="openAttachmentInNewTab('${ticket.id}', ${idx})">
+                    <i class="fa-solid fa-up-right-from-square"></i> Mở trong tab mới
+                </button>
+                <button type="button" class="btn-secondary" onclick="document.getElementById('previewModal').hidden = true;">
+                    Đóng cửa sổ
+                </button>
+            `;
+        }
+
         previewModal.hidden = false;
     };
 
+    window.openAttachmentInNewTab = async function (ticketId, idx) {
+        const ticket = tickets.find(t => t.id === ticketId);
+        if (!ticket || !ticket.attachments || !ticket.attachments[idx]) return;
+        const att = ticket.attachments[idx];
+        let fileDataUrl = att.previewUrl || await getAttachmentFromIDB(ticketId, idx);
+        if (!fileDataUrl) return;
+
+        const win = window.open();
+        if (win) {
+            if (att.isImage || fileDataUrl.startsWith("data:image/")) {
+                win.document.write(`<body style="margin:0;display:flex;align-items:center;justify-content:center;background:#0f172a;"><img src="${fileDataUrl}" style="max-width:100%;max-height:100vh;"></body>`);
+            } else {
+                win.document.write(`<iframe src="${fileDataUrl}" style="width:100%;height:100vh;border:none;"></iframe>`);
+            }
+        }
+    };
+
     document.getElementById("btnClosePreviewModal").addEventListener("click", () => previewModal.hidden = true);
-    document.getElementById("btnDonePreviewModal").addEventListener("click", () => previewModal.hidden = true);
+    const doneBtn = document.getElementById("btnDonePreviewModal");
+    if (doneBtn) doneBtn.addEventListener("click", () => previewModal.hidden = true);
 }
 
 function renderAll() {
